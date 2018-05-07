@@ -15,12 +15,17 @@ use XML::XPath::XMLParser;
 my $cmdOpts={};
 getopts("s:", $cmdOpts);
 
+
+# Открытие из стандартного ввода
 my $xp = XML::XPath->new(ioref=>'STDIN');
 
 my $curLevel = 0;
 if($cmdOpts->{"s"}){$curLevel += $cmdOpts->{"s"};}
 my $secNames = ['part','chapter','section','subsection'];
 
+
+
+# Замена блоков
 my $ens = {
     'child::text()' => {'pre'=>sub{'';}, 
                         'find'=>'', 
@@ -76,21 +81,22 @@ my $ens = {
     'v'             => {'pre'=>sub{"\n";},
                         'find'=>'child::text()|emphasis|strong',
                         'post'=>sub{'\\\\';}},
-    'emphasis'      => {'pre'=>sub{"";},
+    'emphasis'      => {'pre'=>sub{" \\emph{";},
                         'find'=>'child::text()|emphasis|strong',
-                        'post'=>sub{'';}},
-    'strong'        => {'pre'=>sub{"";},
+                        'post'=>sub{'} ';}},
+    'strong'        => {'pre'=>sub{" \\textbf{";},
                         'find'=>'child::text()|emphasis|strong',
-                        'post'=>sub{'';}}
+                        'post'=>sub{'} ';}}
 };
 
 my $ns;
 
-say '\documentclass[titlepage,10pt]{octavo}';
-say '\usepackage{aviereader}';
+# LaTeX
+say '\documentclass[titlepage,12pt]{book}';
+#say '\usepackage{aviereader}';
 say '\begin{document}';
-say '\hyphenation{впол-не ус-тра-и-ваю не-ждан-но джу-н-г-ли'.
-    ' ба-гро-во}';
+#say '\hyphenation{впол-не ус-тра-и-ваю не-ждан-но джу-н-г-ли'.
+#    ' ба-гро-во}';
 
 $ns = $xp->find('/FictionBook/description/title-info');
 &genRender($ns->get_node(0), 'title-info');
@@ -107,19 +113,29 @@ sub xString($){
     return XML::XPath::XMLParser::as_string($node);
 }
 
+
+# Замены символов регулярками
+
 sub texNorm($){
     my $s = shift;
+	
+	$s =~ s/\x{2014}\x{00A0}/"--*/g;
     $s =~ s/\x{00A0}/\~/g;
     $s =~ s/\x{00B0}/\\degree{}/g;
     $s =~ s/℃/\\degree{}/g;
     $s =~ s/\s+\x{2013}\s+/\ ---\ /g;
+    $s =~ s/\s+[\x{2013}\x{2014}]\s+/\ ---\ /g;
     $s =~ s/^[-\x{2013}](~|\s+)/---~/g;
-    $s =~ s/([\,\!\?])~\x{2013}/$1~---/g;
-    $s =~ s/([\.])[~\s]\x{2013}/$1\ ---/g;
+    $s =~ s/([\,\!\?\:\…\w])~[\x{2013}\x{2014}]/$1~---/g;
+    $s =~ s/([\.])[~\s][\x{2013}\x{2014}]/$1\ ---/g;
     $s =~ s/\s+-\s/\~---\ /g;
-
-    $s =~ s/([[:alpha:]])-([[:alpha:]])/$1\\hyp{}$2/g;
-
+	
+    
+    #$s =~ s/([[:alpha:]])-([[:alpha:]])/$1\\hyp{}$2/g;
+	
+	$s =~ s/…/\\dots/g;
+    $s =~ s/«/ <</g;
+    $s =~ s/»/>>/g;
     $s =~ s/\$/\\\$/g;
     $s =~ s/_/\\textunderscore /g;
     $s =~ s/\x{0435}\x{0301}\x{0301}/ё/g;
